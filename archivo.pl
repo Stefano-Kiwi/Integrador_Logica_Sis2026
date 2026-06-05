@@ -23,9 +23,9 @@ inicializar_sistema :-
     % ATENCIÓN: Revisá que los nombres de los archivos coincidan exactamente con los que descargaste.
     
     % --- Carga del Episodio 4 ---
-    cargar_json('../starwars-episode-4-interactions.json', 4, habla_pura),
-    cargar_json('../starwars-episode-4-mentions.json', 4, mencion),
-    cargar_json('../starwars-episode-4-interactions-allCharacters.json', 4, interaccion_completa),
+    cargar_json('../archive/starwars-episode-4-interactions.json', 4, habla_pura),
+    cargar_json('../archive/starwars-episode-4-mentions.json', 4, mencion),
+    cargar_json('../archive/starwars-episode-4-interactions-allCharacters.json', 4, interaccion_completa),
     
     % --- ACÁ DEBEN AGREGAR LAS LÍNEAS PARA LOS EPISODIOS 1, 2, 3, 5, 6, 7 Y LA SAGA COMPLETA ---
     % Ejemplo para el episodio 5:
