@@ -5,6 +5,8 @@
 
 % Librería sugerida por la cátedra para parsear JSON
 :- use_module(library(http/json)).
+:- use_module(library(http/http_open)).
+:- use_module(library(zip)).
 
 % Declaración estricta de las firmas dinámicas para guardar en memoria
 :- dynamic personaje/1.
@@ -13,68 +15,75 @@
 
 % Predicado principal que pide la consigna
 inicializar_sistema :-
-    % 1. Limpiamos la memoria para evitar datos duplicados si se ejecuta más de una vez (Idempotencia)
+    % 1. Limpiamos la memoria para evitar datos duplicados si se ejecuta m�s de una vez (Idempotencia)
     retractall(personaje(_)),
     retractall(aparece_en(_,_,_)),
     retractall(relacion(_,_,_,_,_)),
-
     % 2. Carga de todos los episodios (1 al 7) y la saga completa.
-    % Los archivos JSON están en la carpeta '../archive/' relativa a este .pl
-
-    % --- Episodio 1 ---
-    cargar_json('../archive/starwars-episode-1-interactions.json', 1, habla_pura),
-    cargar_json('../archive/starwars-episode-1-mentions.json', 1, mencion),
-    cargar_json('../archive/starwars-episode-1-interactions-allCharacters.json', 1, interaccion_completa),
-
-    % --- Episodio 2 ---
-    cargar_json('../archive/starwars-episode-2-interactions.json', 2, habla_pura),
-    cargar_json('../archive/starwars-episode-2-mentions.json', 2, mencion),
-    cargar_json('../archive/starwars-episode-2-interactions-allCharacters.json', 2, interaccion_completa),
-
-    % --- Episodio 3 ---
-    cargar_json('../archive/starwars-episode-3-interactions.json', 3, habla_pura),
-    cargar_json('../archive/starwars-episode-3-mentions.json', 3, mencion),
-    cargar_json('../archive/starwars-episode-3-interactions-allCharacters.json', 3, interaccion_completa),
-
-    % --- Episodio 4 ---
-    cargar_json('../archive/starwars-episode-4-interactions.json', 4, habla_pura),
-    cargar_json('../archive/starwars-episode-4-mentions.json', 4, mencion),
-    cargar_json('../archive/starwars-episode-4-interactions-allCharacters.json', 4, interaccion_completa),
-
-    % --- Episodio 5 ---
-    cargar_json('../archive/starwars-episode-5-interactions.json', 5, habla_pura),
-    cargar_json('../archive/starwars-episode-5-mentions.json', 5, mencion),
-    cargar_json('../archive/starwars-episode-5-interactions-allCharacters.json', 5, interaccion_completa),
-
-    % --- Episodio 6 ---
-    cargar_json('../archive/starwars-episode-6-interactions.json', 6, habla_pura),
-    cargar_json('../archive/starwars-episode-6-mentions.json', 6, mencion),
-    cargar_json('../archive/starwars-episode-6-interactions-allCharacters.json', 6, interaccion_completa),
-
-    % --- Episodio 7 ---
-    cargar_json('../archive/starwars-episode-7-interactions.json', 7, habla_pura),
-    cargar_json('../archive/starwars-episode-7-mentions.json', 7, mencion),
-    cargar_json('../archive/starwars-episode-7-interactions-allCharacters.json', 7, interaccion_completa),
-
-    % --- Saga Completa (contexto: saga_completa) ---
-    cargar_json('../archive/starwars-full-interactions.json', saga_completa, habla_pura),
-    cargar_json('../archive/starwars-full-mentions.json', saga_completa, mencion),
-    cargar_json('../archive/starwars-full-interactions-allCharacters.json', saga_completa, interaccion_completa),
-    cargar_json('../archive/starwars-full-interactions-allCharacters-merged.json', saga_completa, interaccion_completa),
+    descargar_zip,
+    listar_archivos_zip,
 
     write('Todos los datos fueron cargados en memoria exitosamente.'), nl.
 
 % ------------------------------------------------------------------------------
-% Predicados Auxiliares de Lectura e Inserción
+% Predicados Auxiliares de Descarga, Lectura e Inserción
 % ------------------------------------------------------------------------------
+%
+url_dataset('https://www.kaggle.com/api/v1/datasets/download/ruchi798/star-wars').
 
-% cargar_json(+RutaArchivo, +Contexto, +Tipo)
-% Automatiza el abrir, parsear y cerrar el flujo de datos.
-cargar_json(Ruta, Contexto, Tipo) :-
-    open(Ruta, read, Stream),
+descargar_zip :-
+    url_dataset(URL),
+    setup_call_cleanup(
+        http_open(URL, Stream, []),
+        setup_call_cleanup(
+            open('star-wars.zip', write, Out, [type(binary)]),
+            copy_stream_data(Stream, Out),
+            close(Out)
+        ),
+        close(Stream)
+    ).
+
+
+listar_archivos_zip :-
+    zip_open('star-wars.zip', read, Zip, []),
+    zipper_goto(Zip, first),
+    cargar_archivos(Zip),
+    zip_close(Zip).
+
+cargar_archivos(Zip):-
+    cargar_json_zip(Zip),
+    (zipper_goto(Zip, next)
+    -> cargar_archivos(Zip)
+    ; true).
+
+tipo_archivo(Archivo, habla_pura) :-
+    sub_atom(Archivo, _, _, _, "interactions.json").
+
+tipo_archivo(Archivo, mencion) :-
+    sub_atom(Archivo, _, _, _, "mentions.json").
+
+tipo_archivo(Archivo, interaccion_completa) :-
+    sub_atom(Archivo, _, _, _, "allCharacters").
+
+episode_number(Archivo, Ep):-
+    sub_string(Archivo, Pos, _, _, "episode-"),
+    Start is Pos + 8,
+    sub_string(Archivo, Start, 1, _, Ep).
+
+episode_number(Archivo, saga_completa):-
+    sub_string(Archivo, _, _, _, "full").
+
+cargar_json_zip(Zip) :-
+    zipper_file_info(Zip, Archivo, _),
+    %podriamos controlar sobre tipos "desconocidos"
+    tipo_archivo(Archivo, Tipo),
+    %podriamos controlar sobre contextos "desconocidos"
+    episode_number(Archivo, Contexto),
+    zipper_open_current(Zip, Stream, []),
     json_read_dict(Stream, Dict),
     close(Stream),
     procesar_diccionario(Dict, Contexto, Tipo).
+
 
 % procesar_diccionario(+Dict, +Contexto, +Tipo)
 % Navega el JSON y realiza los assertz en memoria usando índices explícitos con between/3.
