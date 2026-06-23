@@ -89,7 +89,12 @@ cargar_json_zip(Zip) :-
 % Navega el JSON y realiza los assertz en memoria usando índices explícitos con between/3.
 % between(+Low, +High, ?X) genera enteros de Low a High — equivale a un "for i = 0 to N-1".
 procesar_diccionario(Dict, Contexto, Tipo) :-
-
+    % Si Contexto se puede transformar en numero, lo hace.
+    % Si falla se convierte en un atomo normal.
+    (   atom_number(Contexto, Contexto_Atom)
+    ->  true
+    ;   Contexto_Atom = Contexto
+    ),
     % 1. Extraer e insertar Nodos (Personajes) usando between para iterar por índice
     length(Dict.nodes, CantNodos),
     MaxNodo is CantNodos - 1,
@@ -100,7 +105,7 @@ procesar_diccionario(Dict, Contexto, Tipo) :-
             % Si el personaje no existe en el catálogo global, lo agregamos
             (\+ personaje(Nodo.name) -> assertz(personaje(Nodo.name)) ; true),
             % Agregamos la aparición en este contexto particular (sin duplicados)
-            (\+ aparece_en(Nodo.name, Contexto, Tipo) -> assertz(aparece_en(Nodo.name, Contexto, Tipo)) ; true)
+            (\+ aparece_en(Nodo.name, Contexto_Atom, Tipo) -> assertz(aparece_en(Nodo.name, Contexto_Atom, Tipo)) ; true)
         )
     ),
 
@@ -115,7 +120,7 @@ procesar_diccionario(Dict, Contexto, Tipo) :-
             nth0(Link.source, Dict.nodes, NodoOrigen),
             nth0(Link.target, Dict.nodes, NodoDestino),
             % Inserción del arco dirigido en el grafo social
-            assertz(relacion(Tipo, NodoOrigen.name, NodoDestino.name, Link.value, Contexto))
+            assertz(relacion(Tipo, NodoOrigen.name, NodoDestino.name, Link.value, Contexto_Atom))
         )
     ).
 
@@ -193,17 +198,22 @@ nucleo_persistente_trilogia_original(Personaje1, Personaje2) :-
 % Usa nb_setarg para contar registros sin que el backtracking destruya el acumulador.
 % ------------------------------------------------------------------------------
 mostrar_personajes(Contexto, Tipo) :-
+    % Si Tipo es una variable libre, asignamos el texto 'Todos', si no, se queda como esta
+    ( var(Tipo)     -> Tipo_Print = 'Todos'    ; Tipo_Print = Tipo ),
+    
+    % Si Contexto es una variable libre, asignamos 'Todos', si no, se queda igual
+    ( var(Contexto) -> Contexto_Print = 'Todos'; Contexto_Print = Contexto ),
     format("~n"),
     format("+----------------------------------------------------+~n"),
-    format("| Contexto: ~w  |  Tipo: ~w~n", [Contexto, Tipo]),
+    format("| Contexto: ~w~t  |  Tipo: ~w~t~53||~n", [Contexto_Print, Tipo_Print]),
     format("+----------------------------------------------------+~n"),
-    format("| ~w~t~50|~n", ['PERSONAJE']),
+    format("| ~w~t~53||~n", ['PERSONAJE']),
     format("+----------------------------------------------------+~n"),
     % Contador mutable: término con un argumento, inicializado en 0
     Contador = counter(0),
     % Bucle por falla: itera SIN acumular puntos de elección en el stack
     (   aparece_en(Nombre, Contexto, Tipo),
-        format("| ~w~t~50|~n", [Nombre]),
+        format("| ~w~t~53||~n", [Nombre]),
         % Incrementar el contador de forma no retractable (nb_setarg)
         arg(1, Contador, N),
         N1 is N + 1,
@@ -213,7 +223,7 @@ mostrar_personajes(Contexto, Tipo) :-
     ),
     format("+----------------------------------------------------+~n"),
     arg(1, Contador, Total),
-    format("| Total: ~w personajes~n", [Total]),
+    format("| Total: ~w personajes~t~53||~n", [Total]),
     format("+----------------------------------------------------+~n").
 
 % ------------------------------------------------------------------------------
@@ -223,16 +233,21 @@ mostrar_personajes(Contexto, Tipo) :-
 % peso mínimo. Usa bucle por falla y nb_setarg para el contador.
 % ------------------------------------------------------------------------------
 mostrar_relaciones(Tipo, Contexto, PesoMinimo) :-
+    % Si Tipo es una variable libre, asignamos el texto 'Todos', si no, se queda como esta
+    ( var(Tipo)     -> Tipo_Print = 'Todos'    ; Tipo_Print = Tipo ),
+
+    % Si Contexto es una variable libre, asignamos 'Todos', si no, se queda igual
+    ( var(Contexto) -> Contexto_Print = 'Todos'; Contexto_Print = Contexto ),
     format("~n"),
     format("+------------------------+------------------------+-------+~n"),
-    format("| Tipo: ~w | Contexto: ~w | Peso >= ~w~n", [Tipo, Contexto, PesoMinimo]),
+    format("| Tipo: ~w | Contexto: ~w | Peso >= ~w~t~58||~n", [Tipo_Print, Contexto_Print, PesoMinimo]),
     format("+------------------------+------------------------+-------+~n"),
-    format("| ~w~t~24|| ~w~t~24|| ~w~t~7|~n", ['ORIGEN', 'DESTINO', 'PESO']),
+    format("| ~w~t~25|| ~w~t~50|| ~w~t~58||~n", ['ORIGEN', 'DESTINO', 'PESO']),
     format("+------------------------+------------------------+-------+~n"),
     Contador = counter(0),
     (   relacion(Tipo, Origen, Destino, Peso, Contexto),
         Peso >= PesoMinimo,
-        format("| ~w~t~24|| ~w~t~24|| ~d~t~7|~n", [Origen, Destino, Peso]),
+        format("| ~w~t~25|| ~w~t~50|| ~d~t~58||~n", [Origen, Destino, Peso]),
         arg(1, Contador, N),
         N1 is N + 1,
         nb_setarg(1, Contador, N1),
@@ -241,5 +256,5 @@ mostrar_relaciones(Tipo, Contexto, PesoMinimo) :-
     ),
     format("+------------------------+------------------------+-------+~n"),
     arg(1, Contador, Total),
-    format("| Total: ~w relaciones~n", [Total]),
+    format("| Total: ~w relaciones~t~58||~n", [Total]),
     format("+------------------------+------------------------+-------+~n").
