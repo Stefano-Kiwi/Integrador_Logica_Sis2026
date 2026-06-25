@@ -2,7 +2,9 @@
 % PROYECTO INTEGRADOR - STAR WARS
 % FASE I: INGESTA DINÁMICA Y NORMALIZACIÓN DE DATOS
 % ==============================================================================
-
+% Cambiamos el working directory para luego leer el Zip
+:- prolog_load_context(directory, Dir),
+   working_directory(_, Dir).
 % Librería sugerida por la cátedra para parsear JSON
 :- use_module(tools).
 
@@ -13,7 +15,7 @@ inicializar_sistema :-
     retractall(aparece_en(_,_,_)),
     retractall(relacion(_,_,_,_,_)),
     % 2. Carga de todos los episodios (1 al 7) y la saga completa.
-    descargar_zip,
+    %descargar_zip,
     listar_archivos_zip,
 
     write('Todos los datos fueron cargados en memoria exitosamente.'), nl.

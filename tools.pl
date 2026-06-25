@@ -44,7 +44,7 @@ listar_archivos_zip :-
     cargar_archivos(Zip),
     zip_close(Zip).
 
-cargar_archivos(Zip):-
+cargar_archivos(Zip) :-
     cargar_json_zip(Zip),
     (zipper_goto(Zip, next)
     -> cargar_archivos(Zip)
